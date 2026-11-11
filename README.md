@@ -1,4 +1,4 @@
-# Vanilla Twerks
+# <img src=".github/assets/icon.gif" width="48" alt=""> Vanilla Twerks
 
 A Fabric mod for Minecraft 26.3: pick [Vanilla Tweaks](https://vanillatweaks.net) resource packs in game.
 

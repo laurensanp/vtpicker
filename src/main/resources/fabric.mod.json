@@ -6,6 +6,7 @@
   "description": "Pick Vanilla Tweaks resource packs in game. The list comes live from vanillatweaks.net, so it is always the site's current one. Unofficial, not made by the Vanilla Tweaks team.",
   "authors": ["laurensanp"],
   "license": "MIT",
+  "icon": "assets/vtpicker/icon.png",
   "environment": "client",
   "entrypoints": {
     "modmenu": ["com.vtpicker.ModMenuIntegration"]
