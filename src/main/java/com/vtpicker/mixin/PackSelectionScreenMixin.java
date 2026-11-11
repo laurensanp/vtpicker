@@ -32,12 +32,16 @@ public abstract class PackSelectionScreenMixin extends Screen {
         this.vtpicker$resourcePacks = packDir.equals(Minecraft.getInstance().getResourcePackDirectory());
     }
 
-    @Inject(method = "init", at = @At("TAIL"))
-    private void vtpicker$addButton(CallbackInfo ci) {
-        if (!this.vtpicker$resourcePacks) {
+    @Unique
+    private Button vtpicker$button;
+
+    // Every tick instead of once in init: Lunar Client rebuilds this screen's widgets after init and drops ours.
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void vtpicker$keepButton(CallbackInfo ci) {
+        if (!this.vtpicker$resourcePacks || this.vtpicker$button != null && this.children().contains(this.vtpicker$button)) {
             return;
         }
-        this.addRenderableWidget(Button.builder(Component.literal("Vanilla Tweaks"), b -> {
+        this.vtpicker$button = this.addRenderableWidget(Button.builder(Component.literal("Vanilla Tweaks"), b -> {
             // Close this screen first (it commits its own pack list), else it would undo our pack when closed later.
             this.onClose();
             Minecraft mc = Minecraft.getInstance();
