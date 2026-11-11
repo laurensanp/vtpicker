@@ -131,25 +131,34 @@ public final class VanillaTweaks {
 
     // ---- selection (remembered between starts) ----
 
-    /** Pack names in the order picked. */
-    public static Set<String> loadSelection() {
+    /**
+     * Pack names in the order picked: "packs" = what the screen shows, "applied" = what the zip in use holds
+     * (older files only have "packs", which was always applied).
+     */
+    public static Set<String> loadSelection(String field) {
         Set<String> names = new LinkedHashSet<>();
         try {
             JsonObject json = JsonParser.parseString(Files.readString(selectionFile())).getAsJsonObject();
-            json.getAsJsonArray("packs").forEach(e -> names.add(e.getAsString()));
+            (json.has(field) ? json.getAsJsonArray(field) : json.getAsJsonArray("packs"))
+                .forEach(e -> names.add(e.getAsString()));
         } catch (IOException | RuntimeException ignored) {
             // first start or broken file: nothing selected
         }
         return names;
     }
 
-    public static void saveSelection(Set<String> names) {
+    public static void saveSelection(Set<String> picked, Set<String> applied) {
         JsonObject json = new JsonObject();
         json.addProperty("version", VERSION);
+        json.add("packs", array(picked));
+        json.add("applied", array(applied));
+        writeQuietly(selectionFile(), GSON.toJson(json));
+    }
+
+    private static JsonArray array(Set<String> names) {
         JsonArray array = new JsonArray();
         names.forEach(array::add);
-        json.add("packs", array);
-        writeQuietly(selectionFile(), GSON.toJson(json));
+        return array;
     }
 
     // ---- building and enabling the pack ----

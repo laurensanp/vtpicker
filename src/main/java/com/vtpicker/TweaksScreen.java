@@ -63,8 +63,8 @@ public class TweaksScreen extends Screen {
     private final Screen parent;
     private List<Category> categories = List.of();
     private final Map<String, Pack> packsByName = new HashMap<>();
-    private final Set<String> picked = VanillaTweaks.loadSelection();
-    private Set<String> applied = new LinkedHashSet<>(this.picked);
+    private final Set<String> picked = VanillaTweaks.loadSelection("packs");
+    private Set<String> applied = VanillaTweaks.loadSelection("applied");
     private int category;
     private String status = "Loading the pack list from vanillatweaks.net…";
     private boolean busy = true;
@@ -105,7 +105,10 @@ public class TweaksScreen extends Screen {
         int y = this.height - 28;
         int w = 100;
         int x = this.width / 2 - (3 * w + 8) / 2;
-        this.addRenderableWidget(Button.builder(Component.literal("Clear all"), b -> this.picked.clear())
+        this.addRenderableWidget(Button.builder(Component.literal("Clear all"), b -> {
+                this.picked.clear();
+                VanillaTweaks.saveSelection(this.picked, this.applied);
+            })
             .bounds(x, y, w, 20).build());
         this.applyButton = this.addRenderableWidget(Button.builder(Component.literal("Apply"), b -> this.apply())
             .bounds(x + w + 4, y, w, 20).build());
@@ -196,6 +199,12 @@ public class TweaksScreen extends Screen {
     // ---- picking and applying ----
 
     private void toggle(Pack pack) {
+        this.pick(pack);
+        // Saved right away, so picks survive closing the screen or quitting the game.
+        VanillaTweaks.saveSelection(this.picked, this.applied);
+    }
+
+    private void pick(Pack pack) {
         if (this.picked.remove(pack.name())) {
             return;
         }
@@ -224,8 +233,8 @@ public class TweaksScreen extends Screen {
                 VanillaTweaks.LOG.warn("Applying failed", error);
                 return;
             }
-            VanillaTweaks.saveSelection(snapshot);
             this.applied = snapshot;
+            VanillaTweaks.saveSelection(this.picked, this.applied);
             this.status = snapshot.isEmpty() ? "Vanilla Tweaks pack removed" : "Applied " + snapshot.size() + " tweaks";
             VanillaTweaks.enable(zip);
         }));
@@ -420,6 +429,10 @@ public class TweaksScreen extends Screen {
 
     @Override
     public void onClose() {
+        // Like the vanilla pack screen: leaving applies what was picked (finishes in the background).
+        if (!this.busy && !this.categories.isEmpty() && !this.picked.equals(this.applied)) {
+            this.apply();
+        }
         this.minecraft.gui.setScreen(this.parent);
     }
 }
