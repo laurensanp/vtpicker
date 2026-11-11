@@ -41,7 +41,7 @@ public abstract class PackSelectionScreenMixin extends Screen {
         if (!this.vtpicker$resourcePacks || this.vtpicker$button != null && this.children().contains(this.vtpicker$button)) {
             return;
         }
-        this.vtpicker$button = this.addRenderableWidget(Button.builder(Component.literal("Vanilla Tweaks"), b -> {
+        this.vtpicker$button = this.addRenderableWidget(Button.builder(Component.literal("Vanilla Twerks"), b -> {
             // Close this screen first (it commits its own pack list), else it would undo our pack when closed later.
             this.onClose();
             Minecraft mc = Minecraft.getInstance();

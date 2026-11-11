@@ -78,7 +78,7 @@ public class TweaksScreen extends Screen {
     private Button applyButton;
 
     public TweaksScreen(@Nullable Screen parent) {
-        super(Component.literal("Vanilla Tweaks"));
+        super(Component.literal("Vanilla Twerks"));
         this.parent = parent;
         VanillaTweaks.fetchCategories().whenComplete((list, error) -> Minecraft.getInstance().execute(() -> {
             this.busy = false;
@@ -235,7 +235,7 @@ public class TweaksScreen extends Screen {
             }
             this.applied = snapshot;
             VanillaTweaks.saveSelection(this.picked, this.applied);
-            this.status = snapshot.isEmpty() ? "Vanilla Tweaks pack removed" : "Applied " + snapshot.size() + " tweaks";
+            this.status = snapshot.isEmpty() ? "Vanilla Twerks pack removed" : "Applied " + snapshot.size() + " tweaks";
             VanillaTweaks.enable(zip);
         }));
     }
@@ -249,7 +249,7 @@ public class TweaksScreen extends Screen {
             : "Apply (" + this.picked.size() + ")"));
         super.extractRenderState(g, mouseX, mouseY, a);
 
-        g.centeredText(this.font, Component.literal("Vanilla Tweaks").withStyle(s -> s.withBold(true)), this.width / 2, 8, 0xFFFFFFFF);
+        g.centeredText(this.font, Component.literal("Vanilla Twerks").withStyle(s -> s.withBold(true)), this.width / 2, 8, 0xFFFFFFFF);
         g.centeredText(this.font, "Resource Packs · " + VanillaTweaks.VERSION + " · " + this.picked.size() + " selected",
             this.width / 2, 20, MUTED);
         if (!this.status.isEmpty()) {

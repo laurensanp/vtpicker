@@ -1,4 +1,4 @@
-# VT Picker
+# Vanilla Twerks
 
 A Fabric mod for Minecraft 26.3: pick [Vanilla Tweaks](https://vanillatweaks.net) resource packs in game.
 
@@ -7,7 +7,7 @@ from their site.
 
 ## Use
 
-- **Options > Resource Packs > Vanilla Tweaks** (top left), or the mod's config button in Mod Menu.
+- **Options > Resource Packs > Vanilla Twerks** (top left), or the mod's config button in Mod Menu.
 - Categories on the left, packs as tiles like on the site. Hover a tile for its description and what it can't be
   combined with; picking a pack drops the ones it clashes with.
 - **Apply** (or just **Done**) asks vanillatweaks.net to build the pack, saves it in `resourcepacks/`, puts it on

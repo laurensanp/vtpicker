@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class VanillaTweaks {
 
-    public static final Logger LOG = LoggerFactory.getLogger("VT Picker");
+    public static final Logger LOG = LoggerFactory.getLogger("Vanilla Twerks");
     public static final String SITE = "https://vanillatweaks.net";
     // shortcut: fixed to the game version this jar is built for; the site names versions like "26.3", "1.21".
     public static final String VERSION = "26.3";
