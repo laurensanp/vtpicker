@@ -29,18 +29,24 @@ import org.jspecify.annotations.Nullable;
  */
 public class TweaksScreen extends Screen {
 
-    // Site colours (selector.css): tiles rgba(26,26,26,.8), picked rgba(163,163,163,.7).
-    private static final int TILE = 0xCC1A1A1A;
-    private static final int TILE_HOVER = 0xCC303030;
-    private static final int TILE_PICKED = 0xB3A3A3A3;
-    private static final int PANEL = 0x99000000;
+    // Flat and dark like Sodium's settings: translucent black panels, one accent colour (the icon's green).
+    private static final int PANEL = 0x90000000;
+    private static final int TILE = 0x18FFFFFF;
+    private static final int HOVER = 0x30FFFFFF;
+    private static final int TILE_PICKED = 0x504FD64F;
     private static final int ACCENT = 0xFF4FD64F;
     private static final int MUTED = 0xFFA0A0A0;
+    private static final Identifier LOGO = Identifier.fromNamespaceAndPath("vtpicker", "logo");
+    private static boolean logoLoaded;
 
-    private static final int TOP = 34;
-    private static final int BOTTOM = 52;
-    private static final int SIDEBAR = 130;
-    private static final int ROW = 14;
+    private static final int EDGE = 6;
+    /** Top of the tile area (below the content panel's title strip). */
+    private static final int TOP = 30;
+    /** Top of the category list (below the sidebar's header with the icon). */
+    private static final int SIDE_TOP = 44;
+    private static final int BOTTOM = 34;
+    private static final int SIDEBAR = 140;
+    private static final int ROW = 16;
     private static final int TILE_W = 66;
     private static final int TILE_H = 62;
     private static final int GAP = 4;
@@ -102,29 +108,26 @@ public class TweaksScreen extends Screen {
 
     @Override
     protected void init() {
-        int y = this.height - 28;
-        int w = 100;
-        int x = this.width / 2 - (3 * w + 8) / 2;
-        this.addRenderableWidget(Button.builder(Component.literal("Clear all"), b -> {
-                this.picked.clear();
-                VanillaTweaks.saveSelection(this.picked, this.applied);
-            })
-            .bounds(x, y, w, 20).build());
-        this.applyButton = this.addRenderableWidget(Button.builder(Component.literal("Apply"), b -> this.apply())
-            .bounds(x + w + 4, y, w, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Done"), b -> this.onClose())
-            .bounds(x + 2 * (w + 4), y, w, 20).build());
+        int y = this.height - 27;
+        int w = 64;
+        int x = this.contentRight() - 3 * w - 2 * GAP;
+        this.addRenderableWidget(new FlatButton(x, y, w, "Clear all", false, b -> {
+            this.picked.clear();
+            VanillaTweaks.saveSelection(this.picked, this.applied);
+        }));
+        this.applyButton = this.addRenderableWidget(new FlatButton(x + w + GAP, y, w, "Apply", true, b -> this.apply()));
+        this.addRenderableWidget(new FlatButton(x + 2 * (w + GAP), y, w, "Done", false, b -> this.onClose()));
         this.layout();
     }
 
     // ---- layout ----
 
     private int contentLeft() {
-        return SIDEBAR + 16;
+        return EDGE + SIDEBAR + 8;
     }
 
     private int contentRight() {
-        return this.width - 12;
+        return this.width - EDGE;
     }
 
     private int contentBottom() {
@@ -164,11 +167,26 @@ public class TweaksScreen extends Screen {
     private void clampScroll() {
         int view = this.contentBottom() - TOP;
         this.scroll = Math.max(0, Math.min(this.scroll, this.contentHeight - view));
-        int sidebarView = this.contentBottom() - TOP;
-        this.sidebarScroll = Math.max(0, Math.min(this.sidebarScroll, this.categories.size() * ROW + 8 - sidebarView));
+        int sidebarView = this.height - EDGE - SIDE_TOP;
+        this.sidebarScroll = Math.max(0, Math.min(this.sidebarScroll, this.categories.size() * ROW - sidebarView));
     }
 
     // ---- icons ----
+
+    /** The mod's own icon, read from the jar: without Fabric API a mod's assets are not in the resource manager. */
+    private static boolean loadLogo() {
+        if (!logoLoaded) {
+            logoLoaded = true;
+            try (java.io.InputStream in = TweaksScreen.class.getResourceAsStream("/assets/vtpicker/icon.png")) {
+                Minecraft.getInstance().getTextureManager().register(LOGO,
+                    new DynamicTexture(() -> "vtpicker logo", NativeImage.read(in)));
+            } catch (java.io.IOException | RuntimeException e) {
+                VanillaTweaks.LOG.warn("Icon not readable", e);
+                return false;
+            }
+        }
+        return Minecraft.getInstance().getTextureManager().getTexture(LOGO) instanceof DynamicTexture;
+    }
 
     private static void requestIcon(String name) {
         if (!REQUESTED.add(name)) {
@@ -247,41 +265,46 @@ public class TweaksScreen extends Screen {
         this.applyButton.active = !this.busy && !this.categories.isEmpty() && !this.picked.equals(this.applied);
         this.applyButton.setMessage(Component.literal(this.picked.equals(this.applied) || this.busy ? "Apply"
             : "Apply (" + this.picked.size() + ")"));
-        super.extractRenderState(g, mouseX, mouseY, a);
-
-        g.centeredText(this.font, Component.literal("Vanilla Twerks").withStyle(s -> s.withBold(true)), this.width / 2, 8, 0xFFFFFFFF);
-        g.centeredText(this.font, "Resource Packs · " + VanillaTweaks.VERSION + " · " + this.picked.size() + " selected",
-            this.width / 2, 20, MUTED);
-        if (!this.status.isEmpty()) {
-            g.centeredText(this.font, this.status, this.width / 2, this.height - 42,
-                this.status.startsWith("Failed") || this.status.startsWith("Could") ? 0xFFFF6060 : ACCENT);
-        }
-
         this.drawSidebar(g, mouseX, mouseY);
         this.drawContent(g, mouseX, mouseY);
+        if (!this.status.isEmpty()) {
+            g.text(this.font, this.status, this.contentLeft() - 2, this.height - 21,
+                this.status.startsWith("Failed") || this.status.startsWith("Could") ? 0xFFFF6060 : ACCENT, true);
+        }
+        // Widgets last, on top of the panels.
+        super.extractRenderState(g, mouseX, mouseY, a);
     }
 
     private void drawSidebar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        int left = 8;
-        int bottom = this.contentBottom();
-        g.fill(left, TOP, left + SIDEBAR, bottom, PANEL);
-        g.enableScissor(left, TOP, left + SIDEBAR, bottom);
+        int left = EDGE;
+        int bottom = this.height - EDGE;
+        g.fill(left, EDGE, left + SIDEBAR, bottom, PANEL);
+        // Header: icon, name, what is selected.
+        if (loadLogo()) {
+            g.blit(RenderPipelines.GUI_TEXTURED, LOGO, left + 6, EDGE + 6, 0, 0, 24, 24, 256, 256, 256, 256);
+        }
+        g.text(this.font, Component.literal("Vanilla Twerks").withStyle(s -> s.withBold(true)), left + 36, EDGE + 8, 0xFFFFFFFF, true);
+        g.text(this.font, VanillaTweaks.VERSION + " · " + this.picked.size() + " picked", left + 36, EDGE + 19, MUTED, true);
+        g.fill(left + 6, SIDE_TOP - 4, left + SIDEBAR - 6, SIDE_TOP - 3, 0x30FFFFFF);
+
+        g.enableScissor(left, SIDE_TOP, left + SIDEBAR, bottom);
         for (int i = 0; i < this.categories.size(); i++) {
             Category c = this.categories.get(i);
-            int y = TOP + 4 + i * ROW - (int) this.sidebarScroll;
+            int y = SIDE_TOP + i * ROW - (int) this.sidebarScroll;
             boolean hover = mouseX >= left && mouseX < left + SIDEBAR && mouseY >= y && mouseY < y + ROW
-                && mouseY >= TOP && mouseY < bottom;
-            if (i == this.category) {
-                g.fill(left, y, left + SIDEBAR, y + ROW, TILE_PICKED);
+                && mouseY >= SIDE_TOP && mouseY < bottom;
+            boolean current = i == this.category;
+            if (current) {
+                g.fill(left, y, left + SIDEBAR, y + ROW, HOVER);
                 g.fill(left, y, left + 2, y + ROW, ACCENT);
             } else if (hover) {
-                g.fill(left, y, left + SIDEBAR, y + ROW, 0x40FFFFFF);
+                g.fill(left, y, left + SIDEBAR, y + ROW, TILE);
             }
             int count = this.countPicked(c);
             String n = count > 0 ? String.valueOf(count) : "";
-            g.text(this.font, this.font.plainSubstrByWidth(c.title(), SIDEBAR - 14 - this.font.width(n)), left + 7, y + 3,
-                0xFFFFFFFF, true);
-            g.text(this.font, n, left + SIDEBAR - 5 - this.font.width(n), y + 3, ACCENT, true);
+            g.text(this.font, this.font.plainSubstrByWidth(c.title(), SIDEBAR - 16 - this.font.width(n)), left + 8, y + 4,
+                current ? ACCENT : hover ? 0xFFFFFFFF : 0xFFD0D0D0, true);
+            g.text(this.font, n, left + SIDEBAR - 6 - this.font.width(n), y + 4, ACCENT, true);
         }
         g.disableScissor();
     }
@@ -303,17 +326,23 @@ public class TweaksScreen extends Screen {
         int left = this.contentLeft();
         int right = this.contentRight();
         int bottom = this.contentBottom();
-        g.fill(left - 4, TOP, right, bottom, PANEL);
+        g.fill(left - 4, EDGE, right, bottom, PANEL);
         if (this.categories.isEmpty()) {
             return;
         }
+        // Title strip: the category and how much of it is picked.
+        Category shown = this.categories.get(this.category);
+        g.text(this.font, Component.literal(shown.title()).withStyle(s -> s.withBold(true)), left, EDGE + 8, 0xFFFFFFFF, true);
+        String info = this.countPicked(shown) + " of " + this.tiles.size() + " picked";
+        g.text(this.font, info, right - 8 - this.font.width(info), EDGE + 8, MUTED, true);
+        g.fill(left, TOP - 4, right - 6, TOP - 3, 0x30FFFFFF);
         g.enableScissor(left - 4, TOP, right, bottom);
         int dy = TOP - (int) this.scroll;
         for (Header h : this.headers) {
             int y = dy + h.y() + 4;
             int x = left + (h.depth() - 1) * 8;
-            g.text(this.font, h.title(), x, y, h.depth() == 1 ? 0xFFFFFFFF : 0xFFD0D0D0, true);
-            g.fill(x + this.font.width(h.title()) + 6, y + 4, right - 10, y + 5, 0x40FFFFFF);
+            g.text(this.font, h.title(), x, y, h.depth() == 1 ? ACCENT : 0xFFD0D0D0, true);
+            g.fill(x + this.font.width(h.title()) + 6, y + 4, right - 10, y + 5, 0x30FFFFFF);
         }
         Pack hovered = null;
         boolean inView = mouseY >= TOP && mouseY < bottom && mouseX >= left - 4 && mouseX < right;
@@ -325,9 +354,11 @@ public class TweaksScreen extends Screen {
             }
             boolean hover = inView && mouseX >= x && mouseX < x + TILE_W && mouseY >= y && mouseY < y + TILE_H;
             boolean on = this.picked.contains(t.pack().name());
-            g.fill(x, y, x + TILE_W, y + TILE_H, on ? TILE_PICKED : hover ? TILE_HOVER : TILE);
+            g.fill(x, y, x + TILE_W, y + TILE_H, on ? TILE_PICKED : hover ? HOVER : TILE);
             if (on) {
-                g.outline(x, y, TILE_W, TILE_H, 0xFFFFFFFF);
+                g.outline(x, y, TILE_W, TILE_H, ACCENT);
+            } else if (hover) {
+                g.outline(x, y, TILE_W, TILE_H, 0x60FFFFFF);
             }
             Icon icon = ICONS.get(t.pack().name());
             int ix = x + (TILE_W - 32) / 2;
@@ -335,7 +366,7 @@ public class TweaksScreen extends Screen {
                 g.blit(RenderPipelines.GUI_TEXTURED, icon.id(), ix, y + 5, 0, 0, 32, 32, icon.width(), icon.height(),
                     icon.width(), icon.height());
             } else {
-                g.fill(ix, y + 5, ix + 32, y + 37, 0x30FFFFFF);
+                g.fill(ix, y + 5, ix + 32, y + 37, TILE);
             }
             List<FormattedCharSequence> lines = this.font.split(Component.literal(t.pack().display()), TILE_W - 4);
             for (int i = 0; i < Math.min(2, lines.size()); i++) {
@@ -359,8 +390,7 @@ public class TweaksScreen extends Screen {
         }
         int bar = Math.max(16, view * view / this.contentHeight);
         int y = TOP + (int) ((view - bar) * this.scroll / (this.contentHeight - view));
-        g.fill(right - 4, TOP, right - 1, bottom, 0x40000000);
-        g.fill(right - 4, y, right - 1, y + bar, 0xFFC0C0C0);
+        g.fill(right - 4, y, right - 2, y + bar, 0x80FFFFFF);
     }
 
     private List<FormattedCharSequence> tooltip(Pack pack) {
@@ -392,17 +422,17 @@ public class TweaksScreen extends Screen {
         }
         double mx = event.x();
         double my = event.y();
-        if (my < TOP || my >= this.contentBottom()) {
-            return false;
-        }
-        if (mx >= 8 && mx < 8 + SIDEBAR) {
-            int i = (int) ((my - TOP - 4 + this.sidebarScroll) / ROW);
-            if (i >= 0 && i < this.categories.size() && i != this.category) {
+        if (mx >= EDGE && mx < EDGE + SIDEBAR) {
+            int i = (int) Math.floor((my - SIDE_TOP + this.sidebarScroll) / ROW);
+            if (my >= SIDE_TOP && my < this.height - EDGE && i >= 0 && i < this.categories.size() && i != this.category) {
                 this.category = i;
                 this.scroll = 0;
                 this.layout();
             }
             return true;
+        }
+        if (my < TOP || my >= this.contentBottom()) {
+            return false;
         }
         int left = this.contentLeft();
         for (Tile t : this.tiles) {
@@ -418,7 +448,7 @@ public class TweaksScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (mx < 8 + SIDEBAR) {
+        if (mx < EDGE + SIDEBAR) {
             this.sidebarScroll -= sy * ROW;
         } else {
             this.scroll -= sy * (TILE_H + GAP) / 2.0;
@@ -434,5 +464,30 @@ public class TweaksScreen extends Screen {
             this.apply();
         }
         this.minecraft.gui.setScreen(this.parent);
+    }
+
+    /** A button without the vanilla texture: dark, lighter under the mouse, accent text for the main action. */
+    private final class FlatButton extends Button {
+
+        private final boolean primary;
+
+        FlatButton(int x, int y, int width, String label, boolean primary, OnPress onPress) {
+            super(x, y, width, 20, Component.literal(label), onPress, DEFAULT_NARRATION);
+            this.primary = primary;
+        }
+
+        @Override
+        protected void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
+            boolean lit = this.active && this.isHoveredOrFocused();
+            g.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, lit ? 0xE0000000 : PANEL);
+            if (this.primary && this.active) {
+                g.fill(this.getX(), this.getY() + this.height - 1, this.getX() + this.width, this.getY() + this.height, ACCENT);
+            }
+            if (this.isFocused()) {
+                g.outline(this.getX(), this.getY(), this.width, this.height, 0xFFFFFFFF);
+            }
+            g.centeredText(TweaksScreen.this.font, this.getMessage(), this.getX() + this.width / 2,
+                this.getY() + 6, !this.active ? 0xFF707070 : this.primary ? ACCENT : 0xFFFFFFFF);
+        }
     }
 }
