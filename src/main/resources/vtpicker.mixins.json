@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "package": "com.vtpicker.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["PackSelectionScreenMixin", "TitleScreenMixin"],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

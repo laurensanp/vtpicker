@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "vtpicker",
+  "version": "${version}",
+  "name": "VT Picker",
+  "description": "Pick Vanilla Tweaks resource packs in game. The list comes live from vanillatweaks.net, so it is always the site's current one. Unofficial, not made by the Vanilla Tweaks team.",
+  "authors": ["laurensanp"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "modmenu": ["com.vtpicker.ModMenuIntegration"]
+  },
+  "mixins": ["vtpicker.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "26.3"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}
