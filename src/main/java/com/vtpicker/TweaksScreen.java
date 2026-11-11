@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -36,7 +37,9 @@ public class TweaksScreen extends Screen {
     private static final int TILE_PICKED = 0x504FD64F;
     private static final int ACCENT = 0xFF4FD64F;
     private static final int MUTED = 0xFFA0A0A0;
-    private static final Identifier LOGO = Identifier.fromNamespaceAndPath("vtpicker", "logo");
+    /** Two frames of the icon (hips down, hips up), swapped every 160 ms like the GIF in the README. */
+    private static final Identifier[] LOGO = {Identifier.fromNamespaceAndPath("vtpicker", "logo0"),
+        Identifier.fromNamespaceAndPath("vtpicker", "logo1")};
     private static boolean logoLoaded;
 
     private static final int EDGE = 6;
@@ -82,6 +85,9 @@ public class TweaksScreen extends Screen {
     private double scroll;
     private double sidebarScroll;
     private Button applyButton;
+    private EditBox searchBox;
+    /** Not blank: the tiles are the packs of every category that match it. */
+    private String query = "";
 
     public TweaksScreen(@Nullable Screen parent) {
         super(Component.literal("Vanilla Twerks"));
@@ -117,7 +123,27 @@ public class TweaksScreen extends Screen {
         }));
         this.applyButton = this.addRenderableWidget(new FlatButton(x + w + GAP, y, w, "Apply", true, b -> this.apply()));
         this.addRenderableWidget(new FlatButton(x + 2 * (w + GAP), y, w, "Done", false, b -> this.onClose()));
+        this.searchBox = new EditBox(this.font, this.contentRight() - 108, EDGE + 4, 100, 16, Component.literal("Search"));
+        this.searchBox.setHint(Component.literal("Search…"));
+        this.searchBox.setMaxLength(60);
+        this.searchBox.setValue(this.query);
+        this.searchBox.setResponder(text -> {
+            this.query = text;
+            this.scroll = 0;
+            this.layout();
+        });
+        this.addRenderableWidget(this.searchBox);
         this.layout();
+    }
+
+    /** Typing searches right away. */
+    @Override
+    protected void setInitialFocus() {
+        this.setInitialFocus(this.searchBox);
+    }
+
+    private boolean searching() {
+        return !this.query.isBlank();
     }
 
     // ---- layout ----
@@ -142,7 +168,11 @@ public class TweaksScreen extends Screen {
         }
         this.category = Math.min(this.category, this.categories.size() - 1);
         int[] y = {4};
-        this.layoutCategory(this.categories.get(this.category), y);
+        if (this.searching()) {
+            this.categories.forEach(c -> this.layoutSearch(c, "", y));
+        } else {
+            this.layoutCategory(this.categories.get(this.category), y);
+        }
         this.contentHeight = y[0];
         this.clampScroll();
     }
@@ -152,16 +182,35 @@ public class TweaksScreen extends Screen {
             this.headers.add(new Header(c.title(), c.depth(), y[0]));
             y[0] += HEADER_H;
         }
+        this.grid(c.packs(), y);
+        c.children().forEach(child -> this.layoutCategory(child, y));
+    }
+
+    /** Search: every category (sub-categories too) that has matching packs, under its full name. */
+    private void layoutSearch(Category c, String parents, int[] y) {
+        String path = parents.isEmpty() ? c.title() : parents + " › " + c.title();
+        List<Pack> found = new ArrayList<>(c.packs().stream()
+            .filter(p -> VanillaTweaks.matches(p, path, this.query)).toList());
+        if (!found.isEmpty()) {
+            // Packs whose own name matches come before those matching by description or category.
+            found.sort(java.util.Comparator.comparing(p -> !VanillaTweaks.matches(p.display(), this.query)));
+            this.headers.add(new Header(path, 1, y[0]));
+            y[0] += HEADER_H;
+            this.grid(found, y);
+        }
+        c.children().forEach(child -> this.layoutSearch(child, path, y));
+    }
+
+    private void grid(List<Pack> packs, int[] y) {
         int columns = Math.max(1, (this.contentRight() - this.contentLeft() - 6 + GAP) / (TILE_W + GAP));
-        for (int i = 0; i < c.packs().size(); i++) {
-            Pack p = c.packs().get(i);
+        for (int i = 0; i < packs.size(); i++) {
+            Pack p = packs.get(i);
             this.tiles.add(new Tile(p, (i % columns) * (TILE_W + GAP), y[0] + (i / columns) * (TILE_H + GAP)));
             requestIcon(p.name());
         }
-        if (!c.packs().isEmpty()) {
-            y[0] += ((c.packs().size() + columns - 1) / columns) * (TILE_H + GAP) + 4;
+        if (!packs.isEmpty()) {
+            y[0] += ((packs.size() + columns - 1) / columns) * (TILE_H + GAP) + 4;
         }
-        c.children().forEach(child -> this.layoutCategory(child, y));
     }
 
     private void clampScroll() {
@@ -177,15 +226,17 @@ public class TweaksScreen extends Screen {
     private static boolean loadLogo() {
         if (!logoLoaded) {
             logoLoaded = true;
-            try (java.io.InputStream in = TweaksScreen.class.getResourceAsStream("/assets/vtpicker/icon.png")) {
-                Minecraft.getInstance().getTextureManager().register(LOGO,
-                    new DynamicTexture(() -> "vtpicker logo", NativeImage.read(in)));
-            } catch (java.io.IOException | RuntimeException e) {
-                VanillaTweaks.LOG.warn("Icon not readable", e);
-                return false;
+            for (int i = 0; i < LOGO.length; i++) {
+                String file = "/assets/vtpicker/icon" + (i == 0 ? "" : "2") + ".png";
+                try (java.io.InputStream in = TweaksScreen.class.getResourceAsStream(file)) {
+                    Minecraft.getInstance().getTextureManager().register(LOGO[i],
+                        new DynamicTexture(() -> "vtpicker logo", NativeImage.read(in)));
+                } catch (java.io.IOException | RuntimeException e) {
+                    VanillaTweaks.LOG.warn("Icon {} not readable", file, e);
+                }
             }
         }
-        return Minecraft.getInstance().getTextureManager().getTexture(LOGO) instanceof DynamicTexture;
+        return Minecraft.getInstance().getTextureManager().getTexture(LOGO[1]) instanceof DynamicTexture;
     }
 
     private static void requestIcon(String name) {
@@ -281,7 +332,7 @@ public class TweaksScreen extends Screen {
         g.fill(left, EDGE, left + SIDEBAR, bottom, PANEL);
         // Header: icon, name, what is selected.
         if (loadLogo()) {
-            g.blit(RenderPipelines.GUI_TEXTURED, LOGO, left + 6, EDGE + 6, 0, 0, 24, 24, 256, 256, 256, 256);
+            g.blit(RenderPipelines.GUI_TEXTURED, LOGO[(int) (System.currentTimeMillis() / 160 % 2)], left + 6, EDGE + 6, 0, 0, 24, 24, 256, 256, 256, 256);
         }
         g.text(this.font, Component.literal("Vanilla Twerks").withStyle(s -> s.withBold(true)), left + 36, EDGE + 8, 0xFFFFFFFF, true);
         g.text(this.font, VanillaTweaks.VERSION + " · " + this.picked.size() + " picked", left + 36, EDGE + 19, MUTED, true);
@@ -293,7 +344,7 @@ public class TweaksScreen extends Screen {
             int y = SIDE_TOP + i * ROW - (int) this.sidebarScroll;
             boolean hover = mouseX >= left && mouseX < left + SIDEBAR && mouseY >= y && mouseY < y + ROW
                 && mouseY >= SIDE_TOP && mouseY < bottom;
-            boolean current = i == this.category;
+            boolean current = i == this.category && !this.searching();
             if (current) {
                 g.fill(left, y, left + SIDEBAR, y + ROW, HOVER);
                 g.fill(left, y, left + 2, y + ROW, ACCENT);
@@ -332,9 +383,17 @@ public class TweaksScreen extends Screen {
         }
         // Title strip: the category and how much of it is picked.
         Category shown = this.categories.get(this.category);
-        g.text(this.font, Component.literal(shown.title()).withStyle(s -> s.withBold(true)), left, EDGE + 8, 0xFFFFFFFF, true);
-        String info = this.countPicked(shown) + " of " + this.tiles.size() + " picked";
-        g.text(this.font, info, right - 8 - this.font.width(info), EDGE + 8, MUTED, true);
+        Component title = Component.literal(this.searching() ? "Search" : shown.title()).withStyle(s -> s.withBold(true));
+        g.text(this.font, title, left, EDGE + 8, 0xFFFFFFFF, true);
+        String info = this.searching() ? this.tiles.size() + " found"
+            : this.countPicked(shown) + " of " + this.tiles.size() + " picked";
+        int infoX = left + this.font.width(title) + 8;
+        if (infoX + this.font.width(info) < this.searchBox.getX() - 6) {
+            g.text(this.font, info, infoX, EDGE + 8, MUTED, true);
+        }
+        if (this.tiles.isEmpty()) {
+            g.text(this.font, "Nothing matches \"" + this.query.trim() + "\"", left, TOP + 8, MUTED, true);
+        }
         g.fill(left, TOP - 4, right - 6, TOP - 3, 0x30FFFFFF);
         g.enableScissor(left - 4, TOP, right, bottom);
         int dy = TOP - (int) this.scroll;
@@ -424,9 +483,12 @@ public class TweaksScreen extends Screen {
         double my = event.y();
         if (mx >= EDGE && mx < EDGE + SIDEBAR) {
             int i = (int) Math.floor((my - SIDE_TOP + this.sidebarScroll) / ROW);
-            if (my >= SIDE_TOP && my < this.height - EDGE && i >= 0 && i < this.categories.size() && i != this.category) {
+            if (my >= SIDE_TOP && my < this.height - EDGE && i >= 0 && i < this.categories.size()
+                && (i != this.category || this.searching())) {
                 this.category = i;
                 this.scroll = 0;
+                this.query = "";
+                this.searchBox.setValue("");
                 this.layout();
             }
             return true;

@@ -30,7 +30,8 @@ def frame(up):
     box(2, 30 - 3, 29, 30 - 3 + 0, BG)
     return im.resize((256, 256), Image.NEAREST)
 
-png, gif = sys.argv[1], sys.argv[2]
+png, png2, gif = sys.argv[1], sys.argv[2], sys.argv[3]
 a, b = frame(False), frame(True)
 a.save(png)
+b.save(png2)  # second frame, for the animation in the picker
 a.save(gif, save_all=True, append_images=[b], duration=160, loop=0)

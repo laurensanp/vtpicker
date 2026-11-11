@@ -129,6 +129,42 @@ public final class VanillaTweaks {
             .replace("&#39;", "'").replace("&amp;", "&").trim();
     }
 
+    // ---- search ----
+
+    /** Every word of the query is in the pack's name, its description or its category, in any order. */
+    public static boolean matches(Pack pack, String categoryTitles, String query) {
+        return matches(pack.display() + " " + pack.description() + " " + categoryTitles, query);
+    }
+
+    /** Ignores case, and spaces and punctuation too ("hotbarstyle" finds "Hotbar-Style", "3d" finds "3D"). */
+    public static boolean matches(String text, String query) {
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        String squashed = lower.replaceAll("[^a-z0-9]", "");
+        for (String word : query.toLowerCase(java.util.Locale.ROOT).trim().split("\\s+")) {
+            if (!lower.contains(word) && !squashed.contains(word.replaceAll("[^a-z0-9]", ""))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Dev start only (-Dvtpicker.open): the search rules above. */
+    public static void selfCheck() {
+        Pack pack = new Pack("HotbarStyleInv", "Hotbar-Style Inventory", "Makes the inventory look like the hotbar.",
+            List.of(), "gui");
+        check(matches(pack, "GUI", "inventory hotbar"));
+        check(matches(pack, "GUI", "HOTBARSTYLE"));
+        check(matches(pack, "GUI", "gui look like"));
+        check(!matches(pack, "GUI", "hotbar zombie"));
+        check(matches(pack, "GUI", "  "));
+    }
+
+    private static void check(boolean ok) {
+        if (!ok) {
+            throw new AssertionError("VT Picker search self-check failed");
+        }
+    }
+
     // ---- selection (remembered between starts) ----
 
     /**

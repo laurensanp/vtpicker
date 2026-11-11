@@ -20,6 +20,7 @@ public class TitleScreenMixin {
     private void vtpicker$open(CallbackInfo ci) {
         if (!vtpicker$opened && Boolean.getBoolean("vtpicker.open")) {
             vtpicker$opened = true;
+            com.vtpicker.VanillaTweaks.selfCheck();
             Minecraft.getInstance().gui.setScreen(new TweaksScreen((TitleScreen) (Object) this));
         }
     }
